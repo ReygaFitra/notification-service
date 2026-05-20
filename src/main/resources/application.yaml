@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: jdbc:postgresql://${DB_NTF_HOST:localhost}:${DB_NTF_PORT:5432}/${DB_NTF_SID:postgres}
+    username: ${DB_NTF_USER:postgres}
+    password: ${DB_NTF_PASSWORD:12345}
+    driver-class-name: org.postgresql.Driver
