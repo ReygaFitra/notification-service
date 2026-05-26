@@ -1,16 +1,67 @@
 spring:
   application:
     name: notification-service
+  #
+  # Database Configurations
+  #
   datasource:
     url: jdbc:postgresql://${DB_NTF_HOST:localhost}:${DB_NTF_PORT:5432}/${DB_NTF_SID:postgres}
     username: ${DB_NTF_USER:postgres}
     password: ${DB_NTF_PASSWORD:12345}
     driver-class-name: org.postgresql.Driver
-
+  #
+  # Flyway Configurations
+  # { Config for Database Migration }
+  #
   flyway:
     enabled: true
-    locations: classpath:db/migration
+    default-schema: ${DB_MIGRATI0ON_DEFAULT_SCHEMA:notification}
+    schemas:
+      - notification
+    create-schemas: ${DB_MIGRATION_CREATE_SCHEMAS:true}
+    locations: ${DB_MIGRATION_SQL_LOCATION:classpath:db/migration}
+  #
+  # Spring Kafka Configurations
+  # { Config for Kafka: Server, Consumer, Producer, Listener }
+  #
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    #
+    # { Kafka Consumer }
+    #
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:notification-service-group}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        isolation.level: read_committed
+    #
+    # { Kafka Producer(Dummy Producer for Testing Local Development) }
+    #
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    #
+    # { Kafka Listener }
+    #
+    listener:
+      ack-mode: manual
+      type: single
+
+#
+# Service Configuration Properties
+# { Configurations for Notification Service }
+#
+notification-service:
+  kafka:
+    topic:
+      notification-requested: ${KAFKA_TOPIC_NOTIFICATION_REQUESTED:notification.requested}
+      notification-dlt: ${KAFKA_TOPIC_NOTIFICATION_DLT:notification.requested.dlt}
 
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [%X{requestId:-}] [kafka:%X{kafkaTopic:-}:%X{kafkaPartition:-}:%X{kafkaOffset:-}] %logger{36} - %msg%n"
   level:
     org.flywaydb: INFO
