@@ -60,6 +60,33 @@ notification-service:
       notification-requested: ${KAFKA_TOPIC_NOTIFICATION_REQUESTED:notification.requested}
       notification-dlt: ${KAFKA_TOPIC_NOTIFICATION_DLT:notification.requested.dlt}
 
+#
+# Actuator Configurations
+# { Configurations for Health, Metrics, and Operational Endpoints }
+#
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+    kafka:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [%X{requestId:-}] [kafka:%X{kafkaTopic:-}:%X{kafkaPartition:-}:%X{kafkaOffset:-}] %logger{36} - %msg%n"

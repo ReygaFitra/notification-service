@@ -31,8 +31,8 @@ public class NotificationCommandService implements INotificationCommandService {
     @Override
     @Transactional
     public void processNotificationEvent(NotificationRequestedEvent event, ConsumerRecord<String, String> consumerRecord) {
-        log.info("[Notification Processing Start] ---> Event ID : {}", event.eventId());
         this.validateEvent(event);
+        log.info("[Notification Processing Start] ---> Event ID : {}", event.eventId());
 
         try {
             TNotificationRequest notificationRequest = this.constructNotificationRequest(event, consumerRecord);
