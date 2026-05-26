@@ -61,5 +61,7 @@ notification-service:
       notification-dlt: ${KAFKA_TOPIC_NOTIFICATION_DLT:notification.requested.dlt}
 
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [%X{requestId:-}] [kafka:%X{kafkaTopic:-}:%X{kafkaPartition:-}:%X{kafkaOffset:-}] %logger{36} - %msg%n"
   level:
     org.flywaydb: INFO

@@ -1,5 +1,6 @@
 package com.reyga_dev.notification_service.config;
 
+import com.reyga_dev.notification_service.config.interceptor.KafkaMdcNotificationRecordInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
@@ -18,10 +19,13 @@ public class KafkaConsumerConfig {
 
     private final KafkaProperties kafkaProperties;
     private final CommonErrorHandler notificationDefaultErrorHandler;
+    private final KafkaMdcNotificationRecordInterceptor notificationRecordInterceptor;
 
-    public KafkaConsumerConfig(KafkaProperties kafkaProperties, CommonErrorHandler notificationDefaultErrorHandler) {
+    public KafkaConsumerConfig(KafkaProperties kafkaProperties, CommonErrorHandler notificationDefaultErrorHandler,
+                               KafkaMdcNotificationRecordInterceptor notificationRecordInterceptor) {
         this.kafkaProperties = kafkaProperties;
         this.notificationDefaultErrorHandler = notificationDefaultErrorHandler;
+        this.notificationRecordInterceptor = notificationRecordInterceptor;
     }
 
     @Bean
@@ -37,6 +41,7 @@ public class KafkaConsumerConfig {
         factory.setConsumerFactory(consumerFactory);
         factory.setConcurrency(3);
         factory.setCommonErrorHandler(notificationDefaultErrorHandler);
+        factory.setRecordInterceptor(notificationRecordInterceptor);
 
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
 
