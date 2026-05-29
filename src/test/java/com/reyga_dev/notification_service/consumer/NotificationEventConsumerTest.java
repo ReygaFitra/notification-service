@@ -48,6 +48,7 @@ class NotificationEventConsumerTest {
         // then
         verify(serviceUtils).readValue(consumerRecord.value(), NotificationRequestedEvent.class);
         verify(notificationCommandService).processNotificationEvent(event, consumerRecord);
+        verify(notificationCommandService).completeNotificationEvent(event.eventId());
         verify(acknowledgment).acknowledge();
         verifyNoMoreInteractions(serviceUtils, notificationCommandService, acknowledgment);
     }
@@ -116,6 +117,7 @@ class NotificationEventConsumerTest {
         assertSame(exception, result);
         verify(serviceUtils).readValue(consumerRecord.value(), NotificationRequestedEvent.class);
         verify(notificationCommandService).processNotificationEvent(event, consumerRecord);
+        verify(notificationCommandService).completeNotificationEvent(event.eventId());
         verify(acknowledgment).acknowledge();
         verifyNoMoreInteractions(serviceUtils, notificationCommandService, acknowledgment);
     }

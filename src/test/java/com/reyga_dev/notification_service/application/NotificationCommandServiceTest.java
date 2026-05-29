@@ -1,5 +1,7 @@
 package com.reyga_dev.notification_service.application;
 
+import com.reyga_dev.notification_service.common.ServiceUtils;
+import com.reyga_dev.notification_service.domain.dto.EmailRequest;
 import com.reyga_dev.notification_service.domain.dto.NotificationRequestedEvent;
 import com.reyga_dev.notification_service.domain.enums.NotificationChannel;
 import com.reyga_dev.notification_service.domain.enums.NotificationDeliveryStatus;
@@ -12,20 +14,17 @@ import com.reyga_dev.notification_service.infrastucture.persistance.repository.N
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -38,6 +37,12 @@ class NotificationCommandServiceTest {
 
     @Mock
     private NotificationDeliveryRepository notificationDeliveryRepository;
+
+    @Mock
+    private INotificationProviderService notificationProviderService;
+
+    @Mock
+    private ServiceUtils serviceUtils;
 
     @InjectMocks
     private NotificationCommandService notificationCommandService;
@@ -53,55 +58,139 @@ class NotificationCommandServiceTest {
     }
 
     @Test
-    void should_SaveNotificationRequestAndDelivery_When_EventIsValid() {
+    void should_UpdateNotificationRequestAndDelivery_When_EventIsValidAndDataIsStored() {
         // given
         NotificationRequestedEvent event = validEvent();
         ConsumerRecord<String, String> consumerRecord = validConsumerRecord();
-        ArgumentCaptor<TNotificationRequest> requestCaptor = ArgumentCaptor.forClass(TNotificationRequest.class);
-        ArgumentCaptor<TNotificationDelivery> deliveryCaptor = ArgumentCaptor.forClass(TNotificationDelivery.class);
+        TNotificationRequest notificationRequest = TNotificationRequest.builder()
+                .eventId(event.eventId())
+                .status(NotificationRequestStatus.STORED)
+                .build();
+        TNotificationDelivery notificationDelivery = TNotificationDelivery.builder()
+                .request(notificationRequest)
+                .status(NotificationDeliveryStatus.PENDING)
+                .build();
+        EmailRequest emailRequest = emailRequest();
+        when(notificationRequestRepository.findByEventId(event.eventId())).thenReturn(Optional.of(notificationRequest));
+        when(notificationDeliveryRepository.findAllByRequestEventId(event.eventId())).thenReturn(List.of(notificationDelivery));
+        when(serviceUtils.convertValue(event.payload(), EmailRequest.class)).thenReturn(emailRequest);
 
         // when
         notificationCommandService.processNotificationEvent(event, consumerRecord);
 
         // then
-        verify(notificationRequestRepository).saveAndFlush(requestCaptor.capture());
-        verify(notificationDeliveryRepository).save(deliveryCaptor.capture());
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
-
-        TNotificationRequest savedRequest = requestCaptor.getValue();
-        assertEquals(event.eventId(), savedRequest.getEventId());
-        assertEquals(event.eventType(), savedRequest.getEventType());
-        assertEquals(event.recipientId(), savedRequest.getRecipientId());
-        assertEquals(event.channel(), savedRequest.getChannel());
-        assertEquals(event.payload(), savedRequest.getPayload());
-        assertEquals(consumerRecord.topic(), savedRequest.getTopicName());
-        assertEquals(consumerRecord.partition(), savedRequest.getPartitionId());
-        assertEquals(consumerRecord.offset(), savedRequest.getOffsetId());
-        assertEquals(NotificationRequestStatus.PROCESSING, savedRequest.getStatus());
-
-        TNotificationDelivery savedDelivery = deliveryCaptor.getValue();
-        assertSame(savedRequest, savedDelivery.getRequest());
-        assertEquals(event.provider(), savedDelivery.getProvider());
-        assertEquals(event.recipientAddress(), savedDelivery.getRecipientAddress());
-        assertEquals(NotificationDeliveryStatus.PENDING, savedDelivery.getStatus());
-        assertEquals(0, savedDelivery.getRetryCount());
+        assertEquals(consumerRecord.topic(), notificationRequest.getTopicName());
+        assertEquals(consumerRecord.partition(), notificationRequest.getPartitionId());
+        assertEquals(consumerRecord.offset(), notificationRequest.getOffsetId());
+        assertEquals(NotificationRequestStatus.PROCESSING, notificationRequest.getStatus());
+        assertEquals(NotificationDeliveryStatus.SENDING, notificationDelivery.getStatus());
+        verify(notificationRequestRepository).findByEventId(event.eventId());
+        verify(notificationRequestRepository).save(notificationRequest);
+        verify(notificationDeliveryRepository).findAllByRequestEventId(event.eventId());
+        verify(notificationDeliveryRepository).saveAll(List.of(notificationDelivery));
+        verify(serviceUtils).convertValue(event.payload(), EmailRequest.class);
+        verify(notificationProviderService).email(event.eventId(), emailRequest, false);
+        verifyNoMoreInteractions(
+                notificationRequestRepository,
+                notificationDeliveryRepository,
+                notificationProviderService,
+                serviceUtils
+        );
     }
 
     @Test
-    void should_IgnoreDuplicateEvent_When_RequestRepositoryThrowsDataIntegrityViolationException() {
+    void should_UpdateNotificationRequestToCompleted_When_EventProcessingIsCompleted() {
+        // given
+        String eventId = "event-001";
+        TNotificationRequest notificationRequest = TNotificationRequest.builder()
+                .eventId(eventId)
+                .status(NotificationRequestStatus.PROCESSING)
+                .build();
+        when(notificationRequestRepository.findByEventId(eventId)).thenReturn(Optional.of(notificationRequest));
+
+        // when
+        notificationCommandService.completeNotificationEvent(eventId);
+
+        // then
+        assertEquals(NotificationRequestStatus.COMPLETED, notificationRequest.getStatus());
+        verify(notificationRequestRepository).findByEventId(eventId);
+        verify(notificationRequestRepository).save(notificationRequest);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
+    }
+
+    @Test
+    void should_UpdateNotificationRequestAndDeliveryToDlq_When_DeadLetterEventIsProcessed() {
         // given
         NotificationRequestedEvent event = validEvent();
         ConsumerRecord<String, String> consumerRecord = validConsumerRecord();
-        when(notificationRequestRepository.saveAndFlush(any(TNotificationRequest.class)))
-                .thenThrow(new DataIntegrityViolationException("Duplicate event ID"));
+        String errorMessage = "Message moved to DLT. topic=notification.requested, partition=1, offset=10";
+        TNotificationRequest notificationRequest = TNotificationRequest.builder()
+                .eventId(event.eventId())
+                .status(NotificationRequestStatus.PROCESSING)
+                .build();
+        TNotificationDelivery notificationDelivery = TNotificationDelivery.builder()
+                .request(notificationRequest)
+                .status(NotificationDeliveryStatus.RETRYING)
+                .build();
+        when(notificationRequestRepository.findByEventId(event.eventId())).thenReturn(Optional.of(notificationRequest));
+        when(notificationDeliveryRepository.findAllByRequestEventId(event.eventId())).thenReturn(List.of(notificationDelivery));
 
         // when
-        notificationCommandService.processNotificationEvent(event, consumerRecord);
+        notificationCommandService.processDeadLetterEvent(event, consumerRecord);
 
         // then
-        verify(notificationRequestRepository).saveAndFlush(any(TNotificationRequest.class));
-        verify(notificationDeliveryRepository, never()).save(any(TNotificationDelivery.class));
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
+        assertEquals(NotificationRequestStatus.DLQ, notificationRequest.getStatus());
+        assertEquals(errorMessage, notificationRequest.getErrorMessage());
+        assertEquals(NotificationDeliveryStatus.DLQ, notificationDelivery.getStatus());
+        assertEquals(errorMessage, notificationDelivery.getErrorMessage());
+        verify(notificationRequestRepository).findByEventId(event.eventId());
+        verify(notificationRequestRepository).save(notificationRequest);
+        verify(notificationDeliveryRepository).findAllByRequestEventId(event.eventId());
+        verify(notificationDeliveryRepository).save(notificationDelivery);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
+    }
+
+    @Test
+    void should_UpdateDeliveryToDlq_When_DeadLetterRequestIsNotFound() {
+        // given
+        NotificationRequestedEvent event = validEvent();
+        ConsumerRecord<String, String> consumerRecord = validConsumerRecord();
+        String errorMessage = "Message moved to DLT. topic=notification.requested, partition=1, offset=10";
+        TNotificationDelivery notificationDelivery = TNotificationDelivery.builder()
+                .status(NotificationDeliveryStatus.RETRYING)
+                .build();
+        when(notificationRequestRepository.findByEventId(event.eventId())).thenReturn(Optional.empty());
+        when(notificationDeliveryRepository.findAllByRequestEventId(event.eventId())).thenReturn(List.of(notificationDelivery));
+
+        // when
+        notificationCommandService.processDeadLetterEvent(event, consumerRecord);
+
+        // then
+        assertEquals(NotificationDeliveryStatus.DLQ, notificationDelivery.getStatus());
+        assertEquals(errorMessage, notificationDelivery.getErrorMessage());
+        verify(notificationRequestRepository).findByEventId(event.eventId());
+        verify(notificationDeliveryRepository).findAllByRequestEventId(event.eventId());
+        verify(notificationDeliveryRepository).save(notificationDelivery);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
+    }
+
+    @Test
+    void should_ThrowInvalidNotificationEventException_When_NotificationRequestIsNotStored() {
+        // given
+        NotificationRequestedEvent event = validEvent();
+        ConsumerRecord<String, String> consumerRecord = validConsumerRecord();
+        when(notificationRequestRepository.findByEventId(event.eventId())).thenReturn(Optional.empty());
+
+        // when
+        InvalidNotificationEventException result = assertThrows(
+                InvalidNotificationEventException.class,
+                () -> notificationCommandService.processNotificationEvent(event, consumerRecord)
+        );
+
+        // then
+        assertEquals("Notification request is not stored", result.getMessage());
+        verify(notificationRequestRepository).findByEventId(event.eventId());
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
     }
 
     @Test
@@ -117,7 +206,7 @@ class NotificationCommandServiceTest {
 
         // then
         assertEquals("Event Payload is Required", result.getMessage());
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
     }
 
     @Test
@@ -134,7 +223,7 @@ class NotificationCommandServiceTest {
 
         // then
         assertEquals("Event ID is Required", result.getMessage());
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
     }
 
     @Test
@@ -151,7 +240,7 @@ class NotificationCommandServiceTest {
 
         // then
         assertEquals("Event Type is Required", result.getMessage());
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
     }
 
     @Test
@@ -168,7 +257,7 @@ class NotificationCommandServiceTest {
 
         // then
         assertEquals("Recipient ID is Required", result.getMessage());
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
     }
 
     @Test
@@ -185,7 +274,7 @@ class NotificationCommandServiceTest {
 
         // then
         assertEquals("Channel is Required", result.getMessage());
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
     }
 
     @Test
@@ -202,7 +291,7 @@ class NotificationCommandServiceTest {
 
         // then
         assertEquals("Provider is Required", result.getMessage());
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
     }
 
     @Test
@@ -219,7 +308,7 @@ class NotificationCommandServiceTest {
 
         // then
         assertEquals("Recipient Address is Required", result.getMessage());
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
     }
 
     @Test
@@ -236,7 +325,7 @@ class NotificationCommandServiceTest {
 
         // then
         assertEquals("Payload is Required", result.getMessage());
-        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository);
+        verifyNoMoreInteractions(notificationRequestRepository, notificationDeliveryRepository, notificationProviderService, serviceUtils);
     }
 
     private NotificationRequestedEvent validEvent() {
@@ -247,7 +336,24 @@ class NotificationCommandServiceTest {
                 NotificationChannel.EMAIL,
                 "SMTP",
                 "reyga@example.com",
-                Map.of("subject", "Welcome", "name", "Reyga")
+                Map.of(
+                        "to", "reyga@example.com",
+                        "subject", "Welcome",
+                        "text", "Hello Reyga",
+                        "html", false
+                )
+        );
+    }
+
+    private EmailRequest emailRequest() {
+        return new EmailRequest(
+                "reyga@example.com",
+                "Welcome",
+                "Hello Reyga",
+                null,
+                null,
+                false,
+                null
         );
     }
 

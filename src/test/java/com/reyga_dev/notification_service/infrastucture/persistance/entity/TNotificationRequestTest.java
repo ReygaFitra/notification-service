@@ -79,7 +79,7 @@ class TNotificationRequestTest {
         // then
         assertNotNull(request.getCreatedAt());
         assertEquals("SYSTEM", request.getCreatedBy());
-        assertEquals(NotificationRequestStatus.PROCESSING, request.getStatus());
+        assertEquals(NotificationRequestStatus.STORED, request.getStatus());
         assertEquals(1, request.getVersion());
         assertNull(request.getUpdatedAt());
         assertNull(request.getModifiedBy());
@@ -93,7 +93,7 @@ class TNotificationRequestTest {
                 .createdAt(createdAt)
                 .createdBy("KAFKA_CONSUMER")
                 .version(7)
-                .status(NotificationRequestStatus.FAILED)
+                .status(NotificationRequestStatus.DLQ)
                 .build();
 
         // when
@@ -103,7 +103,7 @@ class TNotificationRequestTest {
         assertEquals(createdAt, request.getCreatedAt());
         assertEquals("KAFKA_CONSUMER", request.getCreatedBy());
         assertEquals(7, request.getVersion());
-        assertEquals(NotificationRequestStatus.FAILED, request.getStatus());
+        assertEquals(NotificationRequestStatus.DLQ, request.getStatus());
     }
 
     @Test

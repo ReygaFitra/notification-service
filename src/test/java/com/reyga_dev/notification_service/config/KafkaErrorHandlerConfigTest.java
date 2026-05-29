@@ -18,10 +18,10 @@ class KafkaErrorHandlerConfigTest {
     void should_ReturnDefaultErrorHandler_When_ConfigurationIsValid() {
         // given
         KafkaOperations<String, String> kafkaOperations = mockKafkaOperations();
-        KafkaErrorHandlerConfig kafkaErrorHandlerConfig = new KafkaErrorHandlerConfig(kafkaOperations);
+        KafkaErrorHandlerConfig kafkaErrorHandlerConfig = new KafkaErrorHandlerConfig();
 
         // when
-        DefaultErrorHandler result = kafkaErrorHandlerConfig.notificationDefaultErrorHandler();
+        DefaultErrorHandler result = kafkaErrorHandlerConfig.notificationDefaultErrorHandler(kafkaOperations);
 
         // then
         assertNotNull(result);

@@ -8,7 +8,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
@@ -41,7 +40,7 @@ class ServiceUtilsTest {
     }
 
     @Test
-    void should_ThrowIllegalArgumentException_When_JsonIsInvalid() throws JacksonException {
+    void should_ThrowJacksonException_When_JsonIsInvalid() throws JacksonException {
         // given
         String json = "{invalid-json}";
         JacksonException jacksonException = new JacksonException("Invalid JSON") {
@@ -49,14 +48,13 @@ class ServiceUtilsTest {
         when(objectMapper.readValue(json, TestPayload.class)).thenThrow(jacksonException);
 
         // when
-        IllegalArgumentException result = assertThrows(
-                IllegalArgumentException.class,
+        JacksonException result = assertThrows(
+                JacksonException.class,
                 () -> serviceUtils.readValue(json, TestPayload.class)
         );
 
         // then
-        assertEquals("Invalid JSON message", result.getMessage());
-        assertSame(jacksonException, result.getCause());
+        assertSame(jacksonException, result);
         verify(objectMapper).readValue(json, TestPayload.class);
         verifyNoMoreInteractions(objectMapper);
     }

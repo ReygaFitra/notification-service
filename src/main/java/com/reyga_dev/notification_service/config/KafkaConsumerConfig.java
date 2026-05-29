@@ -17,21 +17,11 @@ import java.util.Map;
 @Configuration
 public class KafkaConsumerConfig {
 
-    private final KafkaProperties kafkaProperties;
-    private final CommonErrorHandler notificationDefaultErrorHandler;
-    private final KafkaMdcNotificationRecordInterceptor notificationRecordInterceptor;
-
-    public KafkaConsumerConfig(KafkaProperties kafkaProperties, CommonErrorHandler notificationDefaultErrorHandler,
-                               KafkaMdcNotificationRecordInterceptor notificationRecordInterceptor) {
-        this.kafkaProperties = kafkaProperties;
-        this.notificationDefaultErrorHandler = notificationDefaultErrorHandler;
-        this.notificationRecordInterceptor = notificationRecordInterceptor;
-    }
-
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, String> notificationKafkaListenerContainerFactory() {
-        Map<String, Object> props = new HashMap<>(kafkaProperties.buildConsumerProperties());
+    public ConcurrentKafkaListenerContainerFactory<String, String> notificationKafkaListenerContainerFactory(
+            KafkaProperties kafkaProperties, CommonErrorHandler notificationDefaultErrorHandler, KafkaMdcNotificationRecordInterceptor notificationRecordInterceptor) {
 
+        Map<String, Object> props = new HashMap<>(kafkaProperties.buildConsumerProperties());
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);

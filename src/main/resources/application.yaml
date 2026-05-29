@@ -49,7 +49,26 @@ spring:
     listener:
       ack-mode: manual
       type: single
-
+  #
+  # Mail Configurations
+  # { Configurations for Spring Mail }
+  #
+  mail:
+    host: ${NOTIFICATION_EMAIL_HOST:smtp.gmail.com}
+    port: ${NOTIFICATION_EMAIL_PORT:587}
+    username: ${NOTIFICATION_EMAIL_USERNAME:}
+    password: ${NOTIFICATION_EMAIL_PASSWORD:}
+    properties:
+      mail:
+        transport:
+          protocol: ${NOTIFICATION_EMAIL_TRANSFER_PROTOCOL:smtp}
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: ${NOTIFICATION_EMAIL_SMTP_CONNECTION_TIMEOUT:10000}
+          timeout: ${NOTIFICATION_EMAIL_SMTP_TIMEOUT:10000}
+          writetimeout: ${NOTIFICATION_EMAIL_SMTP_WRITE_TIMEOUT:10000}
 #
 # Service Configuration Properties
 # { Configurations for Notification Service }
@@ -59,6 +78,12 @@ notification-service:
     topic:
       notification-requested: ${KAFKA_TOPIC_NOTIFICATION_REQUESTED:notification.requested}
       notification-dlt: ${KAFKA_TOPIC_NOTIFICATION_DLT:notification.requested.dlt}
+  email:
+    from: ${NOTIFICATION_EMAIL_FROM:sample@mail.com}
+  retry:
+    max-attempts: ${NOTIFICATION_RETRY_MAX_ATTEMPTS:3}
+    wait-duration-millis: ${NOTIFICATION_RETRY_WAIT_DURATION_MILLIS:1000}
+    fail-after-max-attempts: ${NOTIFICATION_RETRY_FAIL_AFTER_MAX_ATTEMPTS:true}
 
 #
 # Actuator Configurations

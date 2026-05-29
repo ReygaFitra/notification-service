@@ -69,7 +69,7 @@ public class TNotificationRequest extends BaseVersionableEntity {
         }
 
         if (status == null) {
-            status = NotificationRequestStatus.PROCESSING;
+            status = NotificationRequestStatus.STORED;
         }
 
         if (createdBy == null) {

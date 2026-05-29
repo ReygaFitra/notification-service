@@ -14,7 +14,7 @@ CREATE TABLE NOTIFICATION.T_NOTIFICATION_REQUEST (
     PARTITION_ID        INT4,
     OFFSET_ID           INT8,
 
-    STATUS              VARCHAR(50) NOT NULL DEFAULT 'PROCESSING',
+    STATUS              VARCHAR(50) NOT NULL DEFAULT 'STORED',
     ERROR_MESSAGE       TEXT,
 
     CREATED_AT          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -30,9 +30,9 @@ CREATE TABLE NOTIFICATION.T_NOTIFICATION_REQUEST (
 
     CONSTRAINT ck_notification_request_status
         CHECK (STATUS IN (
-            'RECEIVED',
+            'STORED',
             'PROCESSING',
-            'FAILED',
+            'COMPLETED',
             'DLQ'
         ))
 );
@@ -64,9 +64,8 @@ CREATE TABLE NOTIFICATION.T_NOTIFICATION_DELIVERY (
     CONSTRAINT ck_notification_delivery_status
         CHECK (status IN (
         'PENDING',
-        'SENDING',
         'SENT',
-        'FAILED',
+        'SENDING',
         'RETRYING',
         'DLQ'
         )),

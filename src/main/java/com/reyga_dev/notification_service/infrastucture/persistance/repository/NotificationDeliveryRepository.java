@@ -4,8 +4,15 @@ import com.reyga_dev.notification_service.infrastucture.persistance.entity.TNoti
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface NotificationDeliveryRepository extends JpaRepository<TNotificationDelivery, UUID> {
+
+    Optional<TNotificationDelivery> findByRequestEventId(String eventId);
+
+    List<TNotificationDelivery> findAllByRequestEventId(String eventId);
+
 }

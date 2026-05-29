@@ -21,15 +21,15 @@ class KafkaConsumerConfigTest {
         KafkaProperties kafkaProperties = new KafkaProperties();
         CommonErrorHandler errorHandler = mock(CommonErrorHandler.class);
         KafkaMdcNotificationRecordInterceptor recordInterceptor = mock(KafkaMdcNotificationRecordInterceptor.class);
-        KafkaConsumerConfig kafkaConsumerConfig = new KafkaConsumerConfig(
-                kafkaProperties,
-                errorHandler,
-                recordInterceptor
-        );
+        KafkaConsumerConfig kafkaConsumerConfig = new KafkaConsumerConfig();
 
         // when
         ConcurrentKafkaListenerContainerFactory<String, String> result =
-                kafkaConsumerConfig.notificationKafkaListenerContainerFactory();
+                kafkaConsumerConfig.notificationKafkaListenerContainerFactory(
+                        kafkaProperties,
+                        errorHandler,
+                        recordInterceptor
+                );
 
         // then
         assertNotNull(result);

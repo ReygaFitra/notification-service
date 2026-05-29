@@ -85,7 +85,7 @@ class TNotificationDeliveryTest {
                 .createdAt(createdAt)
                 .createdBy("KAFKA_CONSUMER")
                 .version(7)
-                .status(NotificationDeliveryStatus.FAILED)
+                .status(NotificationDeliveryStatus.DLQ)
                 .retryCount(4)
                 .build();
 
@@ -96,7 +96,7 @@ class TNotificationDeliveryTest {
         assertEquals(createdAt, delivery.getCreatedAt());
         assertEquals("KAFKA_CONSUMER", delivery.getCreatedBy());
         assertEquals(7, delivery.getVersion());
-        assertEquals(NotificationDeliveryStatus.FAILED, delivery.getStatus());
+        assertEquals(NotificationDeliveryStatus.DLQ, delivery.getStatus());
         assertEquals(4, delivery.getRetryCount());
     }
 
