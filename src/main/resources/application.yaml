@@ -15,11 +15,13 @@ spring:
   #
   flyway:
     enabled: true
-    default-schema: ${DB_MIGRATI0ON_DEFAULT_SCHEMA:notification}
+    default-schema: ${DB_MIGRATI0N_DEFAULT_SCHEMA:notification}
     schemas:
       - notification
     create-schemas: ${DB_MIGRATION_CREATE_SCHEMAS:true}
     locations: ${DB_MIGRATION_SQL_LOCATION:classpath:db/migration}
+    baseline-on-migrate: ${DB_MIGRATION_BASELINE_ON_MIGRATE:true}
+    baseline-version: ${DB_MIGRATION_BASELINE_VERSION:1}
   #
   # Spring Kafka Configurations
   # { Config for Kafka: Server, Consumer, Producer, Listener }
