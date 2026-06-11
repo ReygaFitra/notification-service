@@ -4,11 +4,14 @@ import com.reyga_dev.notification_service.common.ServiceUtils;
 import com.reyga_dev.notification_service.domain.dto.EmailRequest;
 import com.reyga_dev.notification_service.domain.dto.NotificationRequestedEvent;
 import com.reyga_dev.notification_service.domain.enums.NotificationDeliveryStatus;
+import com.reyga_dev.notification_service.domain.enums.NotificationOutboxStatus;
 import com.reyga_dev.notification_service.domain.enums.NotificationRequestStatus;
 import com.reyga_dev.notification_service.domain.exception.InvalidNotificationEventException;
 import com.reyga_dev.notification_service.infrastucture.persistance.entity.TNotificationDelivery;
+import com.reyga_dev.notification_service.infrastucture.persistance.entity.TNotificationOutbox;
 import com.reyga_dev.notification_service.infrastucture.persistance.entity.TNotificationRequest;
 import com.reyga_dev.notification_service.infrastucture.persistance.repository.NotificationDeliveryRepository;
+import com.reyga_dev.notification_service.infrastucture.persistance.repository.NotificationOutboxRepository;
 import com.reyga_dev.notification_service.infrastucture.persistance.repository.NotificationRequestRepository;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -25,15 +28,18 @@ public class NotificationCommandService implements INotificationCommandService {
 
     private final NotificationRequestRepository notificationRequestRepository;
     private final NotificationDeliveryRepository notificationDeliveryRepository;
+    private final NotificationOutboxRepository notificationOutboxRepository;
     private final INotificationProviderService notificationProviderService;
     private final ServiceUtils serviceUtils;
 
     public NotificationCommandService(NotificationRequestRepository notificationRequestRepository,
                                       NotificationDeliveryRepository notificationDeliveryRepository,
+                                      NotificationOutboxRepository notificationOutboxRepository,
                                       INotificationProviderService notificationProviderService,
                                       ServiceUtils serviceUtils) {
         this.notificationRequestRepository = notificationRequestRepository;
         this.notificationDeliveryRepository = notificationDeliveryRepository;
+        this.notificationOutboxRepository = notificationOutboxRepository;
         this.notificationProviderService = notificationProviderService;
         this.serviceUtils = serviceUtils;
     }
@@ -102,6 +108,11 @@ public class NotificationCommandService implements INotificationCommandService {
 
         notificationRequest.setStatus(NotificationRequestStatus.COMPLETED);
         notificationRequestRepository.save(notificationRequest);
+
+        TNotificationOutbox notificationOutbox = notificationOutboxRepository.findByEventId(eventId)
+                        .orElseThrow(() -> new InvalidNotificationEventException("Notification outbox not found"));
+        notificationOutbox.setStatus(NotificationOutboxStatus.SUCCESS);
+        notificationOutboxRepository.save(notificationOutbox);
 
         log.info("[Notification Completed] ---> Notification request completed. eventId={}", eventId);
     }

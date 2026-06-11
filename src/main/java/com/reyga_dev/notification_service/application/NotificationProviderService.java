@@ -86,11 +86,16 @@ public class NotificationProviderService implements INotificationProviderService
             if (request.cc() != null && !request.cc().isBlank()) messageHelper.setCc(request.cc());
             if (request.bcc() != null && !request.bcc().isBlank()) messageHelper.setBcc(request.bcc());
 
+            // todo: Commenting this section temporary, waiting for notification library developmentS
+            /*
+            *
             if (requireAttachment) {
                 for (EmailRequest.Attachment attachment : request.attachments()) {
                     messageHelper.addAttachment(attachment.fileName(), new FileSystemResource(new File(attachment.path())));
                 }
             }
+            *
+            */
 
             return message;
         } catch (MessagingException ex) {

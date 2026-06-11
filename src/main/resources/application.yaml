@@ -1,3 +1,6 @@
+server:
+  port: 8080
+
 spring:
   application:
     name: notification-service
@@ -35,16 +38,8 @@ spring:
       group-id: ${KAFKA_CONSUMER_GROUP_ID:notification-service-group}
       auto-offset-reset: earliest
       enable-auto-commit: false
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
         isolation.level: read_committed
-    #
-    # { Kafka Producer(Dummy Producer for Testing Local Development) }
-    #
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
     #
     # { Kafka Listener }
     #

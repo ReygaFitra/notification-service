@@ -1,9 +1,11 @@
 package com.reyga_dev.notification_service.infrastucture.persistance.entity;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.MappedSuperclass;
 
 import java.time.OffsetDateTime;
 
+@MappedSuperclass
 public abstract class BaseEntity {
     @Column(name = "created_at", nullable = false)
     protected OffsetDateTime createdAt;

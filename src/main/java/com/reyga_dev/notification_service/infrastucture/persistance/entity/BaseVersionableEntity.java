@@ -1,10 +1,12 @@
 package com.reyga_dev.notification_service.infrastucture.persistance.entity;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Version;
 
 import java.time.OffsetDateTime;
 
+@MappedSuperclass
 public abstract class BaseVersionableEntity extends BaseEntity {
     @Version
     @Column(name = "version", nullable = false)
