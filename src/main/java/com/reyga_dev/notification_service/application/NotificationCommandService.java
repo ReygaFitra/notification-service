@@ -1,19 +1,25 @@
 package com.reyga_dev.notification_service.application;
 
+import com.reyga_dev.notification_service.common.ServiceUtils;
+import com.reyga_dev.notification_service.domain.dto.EmailRequest;
 import com.reyga_dev.notification_service.domain.dto.NotificationRequestedEvent;
 import com.reyga_dev.notification_service.domain.enums.NotificationDeliveryStatus;
+import com.reyga_dev.notification_service.domain.enums.NotificationOutboxStatus;
 import com.reyga_dev.notification_service.domain.enums.NotificationRequestStatus;
 import com.reyga_dev.notification_service.domain.exception.InvalidNotificationEventException;
 import com.reyga_dev.notification_service.infrastucture.persistance.entity.TNotificationDelivery;
+import com.reyga_dev.notification_service.infrastucture.persistance.entity.TNotificationOutbox;
 import com.reyga_dev.notification_service.infrastucture.persistance.entity.TNotificationRequest;
 import com.reyga_dev.notification_service.infrastucture.persistance.repository.NotificationDeliveryRepository;
+import com.reyga_dev.notification_service.infrastucture.persistance.repository.NotificationOutboxRepository;
 import com.reyga_dev.notification_service.infrastucture.persistance.repository.NotificationRequestRepository;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 public class NotificationCommandService implements INotificationCommandService {
@@ -22,43 +28,93 @@ public class NotificationCommandService implements INotificationCommandService {
 
     private final NotificationRequestRepository notificationRequestRepository;
     private final NotificationDeliveryRepository notificationDeliveryRepository;
+    private final NotificationOutboxRepository notificationOutboxRepository;
+    private final INotificationProviderService notificationProviderService;
+    private final ServiceUtils serviceUtils;
 
-    public NotificationCommandService(NotificationRequestRepository notificationRequestRepository, NotificationDeliveryRepository notificationDeliveryRepository) {
+    public NotificationCommandService(NotificationRequestRepository notificationRequestRepository,
+                                      NotificationDeliveryRepository notificationDeliveryRepository,
+                                      NotificationOutboxRepository notificationOutboxRepository,
+                                      INotificationProviderService notificationProviderService,
+                                      ServiceUtils serviceUtils) {
         this.notificationRequestRepository = notificationRequestRepository;
         this.notificationDeliveryRepository = notificationDeliveryRepository;
+        this.notificationOutboxRepository = notificationOutboxRepository;
+        this.notificationProviderService = notificationProviderService;
+        this.serviceUtils = serviceUtils;
     }
 
     @Override
     @Transactional
     public void processNotificationEvent(NotificationRequestedEvent event, ConsumerRecord<String, String> consumerRecord) {
-        log.info("[Notification Processing Start] ---> Event ID : {}", event.eventId());
         this.validateEvent(event);
+        log.info("[Notification Processing Start] ---> Event ID : {}", event.eventId());
 
-        try {
-            TNotificationRequest notificationRequest = this.constructNotificationRequest(event, consumerRecord);
-            notificationRequestRepository.saveAndFlush(notificationRequest);
+        TNotificationRequest notificationRequest = notificationRequestRepository.findByEventId(event.eventId())
+                .orElseThrow(() -> new InvalidNotificationEventException("Notification request is not stored"));
 
-            TNotificationDelivery notificationDelivery = this.constructNotificationDelivery(event, notificationRequest);
-            notificationDeliveryRepository.save(notificationDelivery);
+        notificationRequest.setTopicName(consumerRecord.topic());
+        notificationRequest.setPartitionId(consumerRecord.partition());
+        notificationRequest.setOffsetId(consumerRecord.offset());
+        notificationRequest.setStatus(NotificationRequestStatus.PROCESSING);
+        notificationRequestRepository.save(notificationRequest);
 
-            log.info(
-                    "[Notification Processed] ---> Notification event processed. eventId={}, eventType={}, topic={}, partition={}, offset={}",
-                    event.eventId(),
-                    event.eventType(),
-                    consumerRecord.topic(),
-                    consumerRecord.partition(),
-                    consumerRecord.offset()
-            );
-        } catch (DataIntegrityViolationException ex) {
-            log.info(
-                    "[DataIntegrityViolationException] ---> Duplicate notification event ignored. eventId={}, topic={}, partition={}, offset={}",
-                    event.eventId(),
-                    consumerRecord.topic(),
-                    consumerRecord.partition(),
-                    consumerRecord.offset()
-            );
-            log.warn("Exception Message : {}", ex.getMessage());
+        List<TNotificationDelivery> notificationDeliveries = notificationDeliveryRepository.findAllByRequestEventId(event.eventId());
+        notificationDeliveries.forEach(notificationDelivery ->
+                notificationDelivery.setStatus(NotificationDeliveryStatus.SENDING)
+        );
+        notificationDeliveryRepository.saveAll(notificationDeliveries);
+
+        switch (event.channel()) {
+            case EMAIL -> {
+                EmailRequest emailRequest = serviceUtils.convertValue(event.payload(), EmailRequest.class);
+                boolean requireAttachment = emailRequest.attachments() != null && !emailRequest.attachments().isEmpty();
+                notificationProviderService.email(event.eventId(), emailRequest, requireAttachment);
+            }
+            case SMS -> log.info("[SMS Notification Service] ---> On Development");
+            case WHATSAPP -> log.info("[WhatsApp Notification Service] ---> On Development");
+            case PUSH -> log.info("[Push Notification Service] ---> On Development");
         }
+
+        log.info(
+                "[Notification Processed] ---> Notification event marked as processing. eventId={}, eventType={}, topic={}, partition={}, offset={}",
+                event.eventId(), event.eventType(), consumerRecord.topic(), consumerRecord.partition(), consumerRecord.offset()
+        );
+    }
+
+    @Override
+    @Transactional
+    public void processDeadLetterEvent(NotificationRequestedEvent event, ConsumerRecord<String, String> consumerRecord) {
+        String errorMessage = "Message moved to DLT. topic=%s, partition=%s, offset=%s"
+                .formatted(consumerRecord.topic(), consumerRecord.partition(), consumerRecord.offset());
+
+        notificationRequestRepository.findByEventId(event.eventId()).ifPresentOrElse(notificationRequest -> {
+            notificationRequest.setStatus(NotificationRequestStatus.DLQ);
+            notificationRequest.setErrorMessage(errorMessage);
+            notificationRequestRepository.save(notificationRequest);
+        }, () -> log.warn("[NOTIFICATION DLT] ---> Notification request not found. eventId={}", event.eventId()));
+
+        notificationDeliveryRepository.findAllByRequestEventId(event.eventId()).forEach(notificationDelivery -> {
+            notificationDelivery.setStatus(NotificationDeliveryStatus.DLQ);
+            notificationDelivery.setErrorMessage(errorMessage);
+            notificationDeliveryRepository.save(notificationDelivery);
+        });
+    }
+
+    @Transactional
+    public void completeNotificationEvent(String eventId) {
+        TNotificationRequest notificationRequest = notificationRequestRepository.findByEventId(eventId)
+                .orElseThrow(() -> new InvalidNotificationEventException("Notification request is not stored"));
+
+        notificationRequest.setStatus(NotificationRequestStatus.COMPLETED);
+        notificationRequestRepository.save(notificationRequest);
+
+        TNotificationOutbox notificationOutbox = notificationOutboxRepository.findByEventId(eventId)
+                        .orElseThrow(() -> new InvalidNotificationEventException("Notification outbox not found"));
+        notificationOutbox.setStatus(NotificationOutboxStatus.SUCCESS);
+        notificationOutboxRepository.save(notificationOutbox);
+
+        log.info("[Notification Completed] ---> Notification request completed. eventId={}", eventId);
     }
 
     private void validateEvent(NotificationRequestedEvent event) {
@@ -70,32 +126,6 @@ public class NotificationCommandService implements INotificationCommandService {
         if (isBlank(event.provider())) throw new InvalidNotificationEventException("Provider is Required");
         if (isBlank(event.recipientAddress())) throw new InvalidNotificationEventException("Recipient Address is Required");
         if (event.payload() == null) throw new InvalidNotificationEventException("Payload is Required");
-    }
-
-    private TNotificationRequest constructNotificationRequest(NotificationRequestedEvent event, ConsumerRecord<String, String> consumerRecord) {
-        return TNotificationRequest.builder()
-                .eventId(event.eventId())
-                .eventType(event.eventType())
-                .recipientId(event.recipientId())
-                .channel(event.channel())
-                .payload(event.payload())
-                .topicName(consumerRecord.topic())
-                .partitionId(consumerRecord.partition())
-                .offsetId(consumerRecord.offset())
-                .status(NotificationRequestStatus.PROCESSING)
-                .createdBy("KAFKA_CONSUMER")
-                .build();
-    }
-
-    private TNotificationDelivery constructNotificationDelivery(NotificationRequestedEvent event, TNotificationRequest notificationRequest) {
-        return TNotificationDelivery.builder()
-                .request(notificationRequest)
-                .provider(event.provider())
-                .recipientAddress(event.recipientAddress())
-                .status(NotificationDeliveryStatus.PENDING)
-                .retryCount(0)
-                .createdBy("KAFKA_CONSUMER")
-                .build();
     }
 
     private boolean isBlank(String value) {

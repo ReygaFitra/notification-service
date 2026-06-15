@@ -36,6 +36,7 @@ public class NotificationEventConsumer {
 
         NotificationRequestedEvent event = serviceUtils.readValue(consumerRecord.value(), NotificationRequestedEvent.class);
         notificationCommandService.processNotificationEvent(event, consumerRecord);
+        notificationCommandService.completeNotificationEvent(event.eventId());
 
         acknowledgment.acknowledge();
 

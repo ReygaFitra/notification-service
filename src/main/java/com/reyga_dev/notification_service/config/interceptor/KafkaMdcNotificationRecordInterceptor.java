@@ -16,24 +16,24 @@ import java.util.UUID;
 public class KafkaMdcNotificationRecordInterceptor implements RecordInterceptor<String, String> {
 
     @Override
-    public @Nullable ConsumerRecord<String, String> intercept(ConsumerRecord<String, String> record, Consumer<String, String> consumer) {
-        String requestId = extractRequestId(record);
+    public @Nullable ConsumerRecord<String, String> intercept(ConsumerRecord<String, String> eventRecord, Consumer<String, String> consumerData) {
+        String requestId = extractRequestId(eventRecord);
 
         MDC.put("requestId", requestId);
-        MDC.put("kafkaTopic", record.topic());
-        MDC.put("kafkaPartition", String.valueOf(record.partition()));
-        MDC.put("kafkaOffset", String.valueOf(record.offset()));
+        MDC.put("kafkaTopic", eventRecord.topic());
+        MDC.put("kafkaPartition", String.valueOf(eventRecord.partition()));
+        MDC.put("kafkaOffset", String.valueOf(eventRecord.offset()));
 
-        return record;
+        return eventRecord;
     }
 
     @Override
-    public void afterRecord(ConsumerRecord<String, String> record, Consumer<String, String> consumer) {
+    public void afterRecord(ConsumerRecord<String, String> eventRecord, Consumer<String, String> consumerData) {
         MDC.clear();
     }
 
-    private String extractRequestId(ConsumerRecord<String, String> record) {
-        Header header = record.headers().lastHeader(ServiceHeaders.REQUEST_ID.getLabel());
+    private String extractRequestId(ConsumerRecord<String, String> eventRecord) {
+        Header header = eventRecord.headers().lastHeader(ServiceHeaders.REQUEST_ID.getLabel());
 
         if (header == null || header.value() == null) {
             return UUID.randomUUID().toString();

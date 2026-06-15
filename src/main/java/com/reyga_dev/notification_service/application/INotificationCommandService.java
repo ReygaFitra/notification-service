@@ -7,4 +7,6 @@ public interface INotificationCommandService {
 
     void processNotificationEvent(NotificationRequestedEvent event,  ConsumerRecord<String, String> consumerRecord);
 
+    void processDeadLetterEvent(NotificationRequestedEvent event, ConsumerRecord<String, String> consumerRecord);
+
 }

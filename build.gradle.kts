@@ -4,18 +4,22 @@ import org.gradle.kotlin.dsl.named
 
 plugins {
 	java
-	id("org.springframework.boot") version "4.0.6"
-	id("io.spring.dependency-management") version "1.1.7"
-	id("org.hibernate.orm") version "7.2.12.Final"
-	id("org.graalvm.buildtools.native") version "1.1.0"
+	id("org.springframework.boot")
+	id("io.spring.dependency-management")
+	id("org.hibernate.orm")
+	id("org.graalvm.buildtools.native")
 }
 
 group = "com.reyga-dev"
 version = "0.0.1-SNAPSHOT"
 
+val javaVersion: String by project
+val resilience4jVersion: String by project
+val testcontainersVersion: String by project
+
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(25)
+		languageVersion = JavaLanguageVersion.of(javaVersion)
 	}
 }
 
@@ -27,10 +31,13 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.springframework.boot:spring-boot-starter-kafka")
+	implementation("org.springframework.boot:spring-boot-starter-mail")
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.flywaydb:flyway-core")
 	implementation("org.flywaydb:flyway-database-postgresql")
-	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	implementation("io.micrometer:micrometer-registry-prometheus")
 	implementation("com.fasterxml.jackson.core:jackson-databind")
+	implementation("io.github.resilience4j:resilience4j-retry:$resilience4jVersion")
 //	developmentOnly("org.springframework.boot:spring-boot-docker-compose")
 
 	runtimeOnly("org.postgresql:postgresql")
@@ -39,6 +46,7 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 	testImplementation("org.springframework.kafka:spring-kafka-test")
+	testImplementation(platform("org.testcontainers:testcontainers-bom:$testcontainersVersion"))
 	testImplementation("org.testcontainers:kafka")
 	testImplementation("org.testcontainers:postgresql")
 	testImplementation("org.testcontainers:junit-jupiter")

@@ -1,6 +1,7 @@
 package com.reyga_dev.notification_service.config;
 
 import com.reyga_dev.notification_service.domain.exception.InvalidNotificationEventException;
+import com.reyga_dev.notification_service.domain.exception.NotificationProcessingException;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,14 +13,8 @@ import org.springframework.util.backoff.FixedBackOff;
 @Configuration
 public class KafkaErrorHandlerConfig {
 
-    private final KafkaOperations<String, String> kafkaOperations;
-
-    public KafkaErrorHandlerConfig(KafkaOperations<String, String> kafkaOperations) {
-        this.kafkaOperations = kafkaOperations;
-    }
-
     @Bean
-    public DefaultErrorHandler notificationDefaultErrorHandler() {
+    public DefaultErrorHandler notificationDefaultErrorHandler(KafkaOperations<String, String> kafkaOperations) {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 kafkaOperations,
                 (consumerRecord, exception) -> new TopicPartition(
@@ -36,7 +31,8 @@ public class KafkaErrorHandlerConfig {
 
         errorHandler.addNotRetryableExceptions(
                 IllegalArgumentException.class,
-                InvalidNotificationEventException.class
+                InvalidNotificationEventException.class,
+                NotificationProcessingException.class
         );
 
         return errorHandler;

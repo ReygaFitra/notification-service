@@ -1,0 +1,42 @@
+CREATE TABLE IF NOT EXISTS NOTIFICATION.T_NOTIFICATION_OUTBOX (
+    ID                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    REQUEST_ID          UUID NOT NULL,
+    EVENT_ID            VARCHAR(100) NOT NULL,
+
+    TOPIC_NAME          VARCHAR(100) NOT NULL,
+    MESSAGE_KEY         VARCHAR(100) NOT NULL,
+    PAYLOAD             JSONB NOT NULL,
+
+    STATUS              VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+    RETRY_COUNT         INT2 NOT NULL DEFAULT 0,
+    ERROR_MESSAGE       TEXT,
+    PUBLISHED_AT        TIMESTAMPTZ,
+
+    CREATED_AT          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UPDATED_AT          TIMESTAMPTZ,
+    CREATED_BY          VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    MODIFIED_BY         VARCHAR(50),
+    VERSION             INT2 NOT NULL DEFAULT 1,
+
+    CONSTRAINT fk_notification_outbox_request
+        FOREIGN KEY (REQUEST_ID)
+        REFERENCES NOTIFICATION.T_NOTIFICATION_REQUEST (ID)
+        ON DELETE CASCADE,
+
+    CONSTRAINT ck_notification_outbox_status
+        CHECK (STATUS IN (
+            'PENDING',
+            'SUCCESS',
+            'RETRY',
+            'FAILED'
+        )),
+
+    CONSTRAINT ck_notification_outbox_retry_count
+        CHECK (RETRY_COUNT >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_outbox_status_created_at
+    ON NOTIFICATION.T_NOTIFICATION_OUTBOX (STATUS, CREATED_AT);
+
+CREATE INDEX IF NOT EXISTS idx_notification_outbox_event_id
+    ON NOTIFICATION.T_NOTIFICATION_OUTBOX (EVENT_ID);

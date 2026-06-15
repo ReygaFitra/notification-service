@@ -7,7 +7,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
-import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -42,7 +41,7 @@ public class TNotificationRequest extends BaseVersionableEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
-    private Map<String, Object> payload;
+    private String payload;
 
     @Column(name = "topic_name", length = 100)
     private String topicName;
@@ -69,7 +68,7 @@ public class TNotificationRequest extends BaseVersionableEntity {
         }
 
         if (status == null) {
-            status = NotificationRequestStatus.PROCESSING;
+            status = NotificationRequestStatus.STORED;
         }
 
         if (createdBy == null) {
@@ -103,7 +102,7 @@ public class TNotificationRequest extends BaseVersionableEntity {
             String eventType,
             String recipientId,
             NotificationChannel channel,
-            Map<String, Object> payload,
+            String payload,
             String topicName,
             Integer partitionId,
             Long offsetId,
@@ -130,7 +129,7 @@ public class TNotificationRequest extends BaseVersionableEntity {
             String eventType,
             String recipientId,
             NotificationChannel channel,
-            Map<String, Object> payload,
+            String payload,
             String topicName,
             Integer partitionId,
             Long offsetId,
@@ -194,11 +193,11 @@ public class TNotificationRequest extends BaseVersionableEntity {
         this.channel = channel;
     }
 
-    public Map<String, Object> getPayload() {
+    public String getPayload() {
         return payload;
     }
 
-    public void setPayload(Map<String, Object> payload) {
+    public void setPayload(String payload) {
         this.payload = payload;
     }
 
@@ -253,7 +252,7 @@ public class TNotificationRequest extends BaseVersionableEntity {
         private String eventType;
         private String recipientId;
         private NotificationChannel channel;
-        private Map<String, Object> payload;
+        private String payload;
         private String topicName;
         private Integer partitionId;
         private Long offsetId;
@@ -313,7 +312,7 @@ public class TNotificationRequest extends BaseVersionableEntity {
             return this;
         }
 
-        public Builder payload(Map<String, Object> payload) {
+        public Builder payload(String payload) {
             this.payload = payload;
             return this;
         }

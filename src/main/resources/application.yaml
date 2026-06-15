@@ -1,3 +1,6 @@
+server:
+  port: 8080
+
 spring:
   application:
     name: notification-service
@@ -15,11 +18,13 @@ spring:
   #
   flyway:
     enabled: true
-    default-schema: ${DB_MIGRATI0ON_DEFAULT_SCHEMA:notification}
+    default-schema: ${DB_MIGRATI0N_DEFAULT_SCHEMA:notification}
     schemas:
       - notification
     create-schemas: ${DB_MIGRATION_CREATE_SCHEMAS:true}
     locations: ${DB_MIGRATION_SQL_LOCATION:classpath:db/migration}
+    baseline-on-migrate: ${DB_MIGRATION_BASELINE_ON_MIGRATE:true}
+    baseline-version: ${DB_MIGRATION_BASELINE_VERSION:1}
   #
   # Spring Kafka Configurations
   # { Config for Kafka: Server, Consumer, Producer, Listener }
@@ -33,23 +38,34 @@ spring:
       group-id: ${KAFKA_CONSUMER_GROUP_ID:notification-service-group}
       auto-offset-reset: earliest
       enable-auto-commit: false
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
         isolation.level: read_committed
-    #
-    # { Kafka Producer(Dummy Producer for Testing Local Development) }
-    #
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
     #
     # { Kafka Listener }
     #
     listener:
       ack-mode: manual
       type: single
-
+  #
+  # Mail Configurations
+  # { Configurations for Spring Mail }
+  #
+  mail:
+    host: ${NOTIFICATION_EMAIL_HOST:smtp.gmail.com}
+    port: ${NOTIFICATION_EMAIL_PORT:587}
+    username: ${NOTIFICATION_EMAIL_USERNAME:}
+    password: ${NOTIFICATION_EMAIL_PASSWORD:}
+    properties:
+      mail:
+        transport:
+          protocol: ${NOTIFICATION_EMAIL_TRANSFER_PROTOCOL:smtp}
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: ${NOTIFICATION_EMAIL_SMTP_CONNECTION_TIMEOUT:10000}
+          timeout: ${NOTIFICATION_EMAIL_SMTP_TIMEOUT:10000}
+          writetimeout: ${NOTIFICATION_EMAIL_SMTP_WRITE_TIMEOUT:10000}
 #
 # Service Configuration Properties
 # { Configurations for Notification Service }
@@ -59,6 +75,39 @@ notification-service:
     topic:
       notification-requested: ${KAFKA_TOPIC_NOTIFICATION_REQUESTED:notification.requested}
       notification-dlt: ${KAFKA_TOPIC_NOTIFICATION_DLT:notification.requested.dlt}
+  email:
+    from: ${NOTIFICATION_EMAIL_FROM:sample@mail.com}
+  retry:
+    max-attempts: ${NOTIFICATION_RETRY_MAX_ATTEMPTS:3}
+    wait-duration-millis: ${NOTIFICATION_RETRY_WAIT_DURATION_MILLIS:1000}
+    fail-after-max-attempts: ${NOTIFICATION_RETRY_FAIL_AFTER_MAX_ATTEMPTS:true}
+
+#
+# Actuator Configurations
+# { Configurations for Health, Metrics, and Operational Endpoints }
+#
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+    kafka:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
 
 logging:
   pattern:
